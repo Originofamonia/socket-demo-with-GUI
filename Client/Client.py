@@ -236,19 +236,14 @@ class Application():
                 self.localsong.insert(END, item)
         self.localsong.pack()
 
-        Button(self.frm_L, text="Play",
-               command=self.localplay, width=15).pack()
-        Label(self.frm_L, text = 'Avaliable PlayLists',
+        Button(self.frm_L, text="Show Available PlayLists",
+               command=self.showallplaylists, width=20).pack()
+        Label(self.frm_L, text = 'Available PlayLists',
              font =('Arial',10)).pack()
 
         self.playLists_var = StringVar()
         self.playLists = Listbox(self.frm_L, width=20,
             height=10, listvariable = self.playLists_var)
-        self.theplayList = getPlayLists(s) ##### Function 3 Called #####
-        # Get all avaliable playlists at start
-        for item in self.theplayList:
-            self.thelist = str(item) + ". " + self.theplayList[item]
-            self.playLists.insert(END, self.thelist)
 
         Button(self.frm_L, text="Create PlayList",
                command=self.createlist, width=15).pack(side=BOTTOM)
@@ -305,10 +300,9 @@ class Application():
             height=10, listvariable = self.songList_var)
 
         self.frm_RB = Frame(self.frm_R)
-        Button(self.frm_RB, text="Play",
-               command=self.listplay, width=15).pack()
         Button(self.frm_RB, text="Remove Song",
                command=self.removelistsong, width=15).pack()
+        Label(self.frm_RB, text = ' ').pack()
         self.frm_RB.pack(side=BOTTOM)
         
         self.songList.pack()
@@ -411,31 +405,12 @@ class Application():
         listID = int(self.listname["text"].split(". ")[0])
         EditSong(songID, listID, "remove", s) ##### Function 6 Called #####
 
-    def localplay(self):
-        songName = self.localsong.get(self.localsong.curselection())
-        #playsound.playsound("Song/" + songName)
-        print("Playing......")
-
-    def listplay(self):
-        Song = self.songList.get(self.songList.curselection())
-        songID = int(Song.split(". ")[0])
-        songName = Song.split(". ")[1].replace(".mp3","")
-        count = 0
-        flag = True
-        localsong = self.localsong_var.get().split(", ")
-        for item in localsong:
-            if songName in localsong[count]:
-                print("The song is exist in local file")
-                print("Now using local song file to play")
-                flag = False
-                break
-            count = count + 1
-        if flag:
-            print(songName)
-            getSongByID(songID, songName, s) ##### Function 5 Called #####
-            print("Now start playing")
-            self.localsong.insert(END, songName + ".mp3")
-        #playsound.playsound("Song/" + songName + ".mp3")
+    def showallplaylists(self):
+        self.theplayList = getPlayLists(s) ##### Function 3 Called #####
+        # Get all avaliable playlists at start
+        for item in self.theplayList:
+            self.thelist = str(item) + ". " + self.theplayList[item]
+            self.playLists.insert(END, self.thelist)
         
 # main()
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -445,9 +420,3 @@ root = Application()
 mainloop()
 
 s.close()
-
-
-
-
-        
-
