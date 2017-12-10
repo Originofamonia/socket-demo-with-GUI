@@ -6,7 +6,7 @@ Both Sever and Client contain two file folders called ‘Song’ and ‘Lists’
 Data format in playlists.txt: <br>
 "playlist name" <br>
 "SongID", "SongName" <br>
-"SongID", "SongName" …… <br>
+"SongID", "SongName" …… <br> <br>
 For example, in 1_playlist.txt: <br>
 List A <br>
 1,Song A <br>
