@@ -4,6 +4,7 @@ import pickle
 import string
 import os
 from tkinter import *
+from tkinter.filedialog import askopenfilename
 
 
 class Command:
@@ -12,28 +13,29 @@ class Command:
 
 
 # 1.Adding Songs (and return SongID)
-def addSong(songName, s):
+def add_song(song_name, s):
+    # send file from client to server
     try:
-        addCommand = Command()
-        addCommand.command = "AddSong" + " " + songName.replace(' ', '_')
+        add_command = Command()
+        add_command.command = "AddSong" + " " + song_name.replace(' ', '_')
         # because ' ' is a divider
-        music = open("Song/" + songName + ".mp3", 'rb')
-        addCommand.payload = music.read()
+        music = open("Song/" + song_name + ".mp3", 'rb')
+        add_command.payload = music.read()
         music.close()  # Set Command and Payload
 
-        packedData = pickle.dumps(addCommand)
-        s.sendall(struct.pack("i", len(packedData)))
-        s.sendall(packedData)  # Send Binary data
+        packed_data = pickle.dumps(add_command)
+        s.sendall(struct.pack("i", len(packed_data)))
+        s.sendall(packed_data)  # Send Binary data
 
-        replyLen = struct.unpack("i", s.recv(4))[0]
+        reply_len = struct.unpack("i", s.recv(4))[0]
         data = bytearray()
-        while (replyLen > len(data)):
-            data += s.recv(replyLen - len(data))
-        replyCommand = pickle.loads(data)  # Receive the server reply
+        while reply_len > len(data):
+            data += s.recv(reply_len - len(data))
+        reply_command = pickle.loads(data)  # Receive the server reply
 
-        ServerCommand = replyCommand.command.split(" ")
-        if ServerCommand[0] == "SongAdded":
-            SongID = ServerCommand[1]
+        server_command = reply_command.command.split(" ")
+        if server_command[0] == "SongAdded":
+            SongID = server_command[1]
             print("The song was successfully added as ID:", SongID)
             return SongID
     except Exception as e:
@@ -41,7 +43,7 @@ def addSong(songName, s):
 
 
 # 2.Creating a playlist:
-def createList(listName, s):
+def create_list(listName, s):
     try:
         addCommand = Command()
         addCommand.command = "CreatePlayList" + " " + listName.replace(' ', '_')
@@ -53,7 +55,7 @@ def createList(listName, s):
 
         replyLen = struct.unpack("i", s.recv(4))[0]
         data = bytearray()
-        while (replyLen > len(data)):
+        while replyLen > len(data):
             data += s.recv(replyLen - len(data))
         replyCommand = pickle.loads(data)  # Receive the server reply
 
@@ -82,7 +84,7 @@ def getPlayLists(s):
 
         replyLen = struct.unpack("i", s.recv(4))[0]
         data = bytearray()
-        while (replyLen > len(data)):
+        while replyLen > len(data):
             data += s.recv(replyLen - len(data))
         replyCommand = pickle.loads(data)  # Receive the server reply
 
@@ -106,7 +108,7 @@ def getPlayList(playlistID, s):
 
         replyLen = struct.unpack("i", s.recv(4))[0]
         data = bytearray()
-        while (replyLen > len(data)):
+        while replyLen > len(data):
             data += s.recv(replyLen - len(data))
 
         replyCommand = pickle.loads(data)
@@ -131,7 +133,7 @@ def getSongByID(songID, songName, s):
 
         replyLen = struct.unpack("i", s.recv(4))[0]
         data = bytearray()
-        while (replyLen > len(data)):
+        while replyLen > len(data):
             data += s.recv(replyLen - len(data))
 
         replyCommand = pickle.loads(data)
@@ -160,7 +162,7 @@ def EditSong(songID, listID, option, s):
 
         replyLen = struct.unpack("i", s.recv(4))[0]
         data = bytearray()
-        while (replyLen > len(data)):
+        while replyLen > len(data):
             data += s.recv(replyLen - len(data))
         replyCommand = pickle.loads(data)  # Receive the server reply
 
@@ -271,6 +273,8 @@ class Application:
                command=self.addsong, width=15).pack(side=TOP)
         Button(self.frm_M, text="<< Get Song",
                command=self.getsong, width=15).pack(side=TOP)
+        # add upload button
+        Button(self.frm_M, text='Upload', command=self.upload, width=15).pack(side=TOP)
         Label(self.frm_M, text='\n\n\n\n\n\n\n\n\n\n').pack(side=TOP)
         Button(self.frm_M, text="Get PlayList >>",
                command=self.getplaylist, width=15).pack(side=TOP)
@@ -279,7 +283,7 @@ class Application:
         # Right
         self.frm_R = Frame(self.frm)
 
-        Button(self.frm_R, text="Remove ↓ From Sever",
+        Button(self.frm_R, text="Remove ↓ From Server",
                command=self.removesong, width=18).pack(side=TOP)
         Label(self.frm_R, text='Sever Song',
               font=('Arial', 10)).pack()
@@ -317,10 +321,41 @@ class Application:
 
         self.frm.pack()
 
+    def upload(self):
+        try:
+            filename = askopenfilename()
+            add_command = Command()
+            add_command.command = f"Upload {filename.replace(' ', '_')}"
+            file = open(filename, 'rb')
+            add_command.payload = file.read()
+            file.close()
+
+            packed_data = pickle.dumps(add_command)
+            self.sock.sendall(struct.pack("i", len(packed_data)))
+            self.sock.sendall(packed_data)
+
+            reply_len = struct.unpack("i", self.sock.recv(4))[0]
+            data = bytearray()
+            while reply_len > len(data):
+                data += self.sock.recv(reply_len - len(data))
+            reply_command = pickle.loads(data)  # Receive the server reply
+
+            server_command = reply_command.command.split(" ")
+            if server_command[0] == "Uploaded":
+                server_filename = server_command[1]
+                print("Echoed server file: ", server_filename)
+                server_file = open(server_filename, 'wb')
+                server_file.write(reply_command.payload)
+                server_file.close()
+                return server_filename
+
+        except Exception as e:
+            print("Error occurred: ", e)
+
     def addsong(self):
         songName = self.localsong.get(self.localsong.curselection())
         songName = songName.replace(".mp3", "")
-        songID = addSong(songName, self.sock)  # Function 1 Called
+        songID = add_song(songName, self.sock)  # Function 1 Called
         self.hostsong.insert(END, songID + ". " + songName + ".mp3")
 
     def getsong(self):
@@ -375,7 +410,7 @@ class Application:
 
     def createlist(self):
         list_name = self.newlistname.get()
-        list_id = createList(list_name, self.sock)  # Function 2 Called
+        list_id = create_list(list_name, self.sock)  # Function 2 Called
         self.playLists.insert(END, list_id + ". " + list_name)
 
     def addsongtolist(self):
@@ -422,7 +457,7 @@ class Application:
 
 def main():
     host = "localhost"
-    port = 4567
+    port = 6789
 
     root = Application(host, port)
     mainloop()

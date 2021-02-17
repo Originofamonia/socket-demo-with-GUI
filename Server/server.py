@@ -110,25 +110,25 @@ class ServerThread(threading.Thread):
                 if len(a) < 4:
                     raise Exception("Client closed socket, ending client thread")
 
-                messageLength = struct.unpack('i', a)[0]
-                print("Message Length: ", messageLength)
+                message_length = struct.unpack('i', a)[0]
+                print("Message Length: ", message_length)
                 data = bytearray()
-                while messageLength > len(data):
-                    data += self.mySocket.recv(messageLength - len(data))
+                while message_length > len(data):
+                    data += self.mySocket.recv(message_length - len(data))
 
-                newCommand = pickle.loads(data)
-                print("\nCommand is: ", newCommand.command.replace('_', ' '))
+                new_command = pickle.loads(data)
+                print("\nCommand is: ", new_command.command.replace('_', ' '))
 
-                ClientCommand = newCommand.command.split(" ")
+                client_command = new_command.command.split(" ")
                 # Divide the command to recognize it, " " is the divider
 
                 # 1.Adding Songs:
-                if ClientCommand[0] == "AddSong":
-                    songName = ClientCommand[1].replace('_', ' ')
+                if client_command[0] == "AddSong":
+                    songName = client_command[1].replace('_', ' ')
                     # Get the Song Name, The space in song name is replaced by '_' in data transform
                     print("Adding song")
 
-                    songID = 1;
+                    songID = 1
                     for key in self.songDict:
                         songID = key + 1
                     # Result: ID of new song = ID of the final song + 1
@@ -136,18 +136,31 @@ class ServerThread(threading.Thread):
                     music = open("Song/" + str(songID) + ".mp3", 'wb')
                     print("Adding", str(songID) + ".mp3",
                           "(Song Name: " + songName + ")")
-                    music.write(newCommand.payload)
+                    music.write(new_command.payload)
                     music.close()  # Save the song as .mp3 file
 
                     self.songDict[songID] = songName
                     saveSongDict(self.songDict)  # Add the song to songlist
 
-                    replyCommand = Command()
-                    replyCommand.command = "SongAdded " + str(songID)
+                    reply_command = Command()
+                    reply_command.command = "SongAdded " + str(songID)
+
+                elif client_command[0] == "Upload":
+                    filename = client_command[1].split('/')[-1]
+                    server_filename = 'server_received_' + filename
+                    file = open(server_filename, 'wb')
+                    file.write(new_command.payload)
+                    file.close()
+
+                    reply_command = Command()
+                    reply_command.command = "Uploaded " + server_filename
+                    server_file = open(server_filename, 'rb')
+                    reply_command.payload = server_file.read()
+                    server_file.close()
 
                 # 2.Creating a playlist:
-                elif ClientCommand[0] == "CreatePlayList":
-                    listName = ClientCommand[1].replace('_', ' ')  # Get the playlist Name
+                elif client_command[0] == "CreatePlayList":
+                    listName = client_command[1].replace('_', ' ')  # Get the playlist Name
                     print("Creating playlist")
 
                     listID = 1
@@ -163,27 +176,27 @@ class ServerThread(threading.Thread):
                     self.listDict[listID] = listName
                     saveListDict(self.listDict)  # Add the song to songlist
 
-                    replyCommand = Command()
-                    replyCommand.command = "PlayListCreated " + str(listID)
+                    reply_command = Command()
+                    reply_command.command = "PlayListCreated " + str(listID)
 
                 # 3.Download a list of playlists available:
-                elif ClientCommand[0] == "GetAllPlayLists":
+                elif client_command[0] == "GetAllPlayLists":
                     print("Sending playlists")
-                    replyCommand = Command()
-                    replyCommand.command = "AllPlayList"
+                    reply_command = Command()
+                    reply_command.command = "AllPlayList"
                     # f = open("Song/songList.txt", "r")
                     # playlists = f.read().replace("\n",",")
                     # playlists = playlists.split(",")
                     # playlists.pop() # At the end of file there is a \n
                     # f.close()
                     # replyCommand.payload = playlists # Return type is python list
-                    replyCommand.payload = self.listDict
+                    reply_command.payload = self.listDict
 
                 # 4.Download a playlist: (by playlistID)
-                elif ClientCommand[0] == "GetPlayList":
-                    playlistID = ClientCommand[1]  # Get the Song ID
+                elif client_command[0] == "GetPlayList":
+                    playlistID = client_command[1]  # Get the Song ID
                     print("Sending playlist")
-                    replyCommand = Command()
+                    reply_command = Command()
 
                     if int(playlistID) not in self.listDict:  # Check if the Song ID exist
                         raise Exception("File not found")
@@ -191,29 +204,29 @@ class ServerThread(threading.Thread):
                     playlist = open("Lists/" + playlistID + "_playlist.txt", 'rb')
                     print("Sending", playlistID + "_playlist.txt",
                           "(List Name: " + self.listDict[int(playlistID)] + ")")
-                    replyCommand.payload = playlist.read()
-                    replyCommand.command = "PlayListList"
+                    reply_command.payload = playlist.read()
+                    reply_command.command = "PlayListList"
                     playlist.close()
 
                 # 5.Download a song by songID:
-                elif ClientCommand[0] == "GetSong":
-                    SongID = ClientCommand[1]  # Get the Song ID
+                elif client_command[0] == "GetSong":
+                    SongID = client_command[1]  # Get the Song ID
                     print("Sending song")
-                    replyCommand = Command()
+                    reply_command = Command()
 
                     if int(SongID) not in self.songDict:  # Check if the Song ID exist
                         raise Exception("File not found")
 
                     music = open("Song/" + SongID + ".mp3", 'rb')
                     print("Sending", SongID + ".mp3", "(" + self.songDict[int(SongID)] + ")")
-                    replyCommand.payload = music.read()
+                    reply_command.payload = music.read()
                     music.close()
-                    replyCommand.command = "SongData"
+                    reply_command.command = "SongData"
 
                 # 6.1.Add song to a playlist:
-                elif ClientCommand[0] == "AddSongToList":
-                    songID = ClientCommand[1]
-                    listID = ClientCommand[2]
+                elif client_command[0] == "AddSongToList":
+                    songID = client_command[1]
+                    listID = client_command[2]
                     print("Adding song to playlist")
 
                     songName = self.songDict[int(songID)]  # get the song name
@@ -235,31 +248,31 @@ class ServerThread(threading.Thread):
                     playlist = open("Lists/" + listID + "_playlist.txt", 'a')
                     print("Adding song(ID: " + songID + ") to " + listID + "_playlist.txt")
 
-                    replyCommand = Command()
+                    reply_command = Command()
                     if int(songID) not in listData:  # Whether song is already in the songlist
                         playlist.write(songData)
-                        replyCommand.command = "SongAdded"
+                        reply_command.command = "SongAdded"
                     else:
-                        replyCommand.command = "SongAddedBefore"  # if song exist in this songlist
+                        reply_command.command = "SongAddedBefore"  # if song exist in this songlist
                     playlist.close()
 
                 # 6.2.Remove song from a playlist:
-                elif ClientCommand[0] == "RemoveSongFromList":
-                    songID = ClientCommand[1]
-                    listID = ClientCommand[2]
+                elif client_command[0] == "RemoveSongFromList":
+                    songID = client_command[1]
+                    listID = client_command[2]
                     print("Removing song to playlist")
                     print("Removing song(ID: " + songID + ") from " + listID + "_playlist.txt")
 
-                    replyCommand = Command()
+                    reply_command = Command()
 
                     if remove_song_from_list(songID, listID, self.listDict):
-                        replyCommand.command = "SongRemoved"
+                        reply_command.command = "SongRemoved"
                     else:
-                        replyCommand.command = "SongNotInList"
+                        reply_command.command = "SongNotInList"
 
                 # 9.Remove a song from the server:
-                elif ClientCommand[0] == "RemoveSong":
-                    songID = ClientCommand[1]
+                elif client_command[0] == "RemoveSong":
+                    songID = client_command[1]
                     print("Removing song")
 
                     try:  # Remove the song file
@@ -278,23 +291,23 @@ class ServerThread(threading.Thread):
                             count = count + 1
                         else:
                             break
-                    replyCommand = Command()
-                    replyCommand.command = "SongRemovedOK"
+                    reply_command = Command()
+                    reply_command.command = "SongRemovedOK"
 
-                # Get all the avaliable songs
-                elif ClientCommand[0] == "GetSongList":
+                # Get all the available songs
+                elif client_command[0] == "GetSongList":
                     print("Sending song list")
-                    replyCommand = Command()
-                    replyCommand.command = "SongList"
-                    replyCommand.payload = self.songDict
+                    reply_command = Command()
+                    reply_command.command = "SongList"
+                    reply_command.payload = self.songDict
 
                 else:
-                    print("Unknown Command:", newCommand.command.replace('_', ' '))
+                    print("Unknown Command:", new_command.command.replace('_', ' '))
                     raise Exception("Unknown Command")
 
-                packedData = pickle.dumps(replyCommand)  # Serialize the class to a binary array
-                self.mySocket.sendall(
-                    struct.pack("i", len(packedData)))  # Length of the message is just the length of the array
+                packedData = pickle.dumps(reply_command)  # Serialize the class to a binary array
+                # Length of the message is just the length of the array
+                self.mySocket.sendall(struct.pack("i", len(packedData)))
                 self.mySocket.sendall(packedData)
 
         except Exception as e:
@@ -305,7 +318,7 @@ class ServerThread(threading.Thread):
 
 def main():
     host = "localhost"
-    port = 4567
+    port = 6789
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((host, port))
@@ -321,7 +334,8 @@ def main():
     while True:
         (clientSocket, address) = server_socket.accept()
         print("Got incoming connection")
-        new_thread = ServerThread(clientSocket, song_dict, list_dict)  # make a new instance of our thread class to handle requests
+        # make a new instance of our thread class to handle requests
+        new_thread = ServerThread(clientSocket, song_dict, list_dict)
         new_thread.start()  # start the thread running....
 
 
