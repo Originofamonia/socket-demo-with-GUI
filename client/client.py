@@ -113,7 +113,7 @@ class Application:
 
 def main():
     host = "localhost"
-    port = 6789
+    port = 8789
 
     root = Application(host, port)
     tk.mainloop()
