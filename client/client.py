@@ -101,7 +101,7 @@ class Application:
             server_command = reply_command.command.split(" ")
             if server_command[0] == "Uploaded":
                 server_filename = server_command[1]
-                self.listbox.insert(2, "Echoed server file: ", server_filename)
+                self.listbox.insert(2, "Server echoed file: ", server_filename)
                 server_file = open(server_filename, 'wb')
                 server_file.write(reply_command.payload)
                 server_file.close()
@@ -113,7 +113,7 @@ class Application:
 
 def main():
     host = "localhost"
-    port = 8789
+    port = 9789
 
     root = Application(host, port)
     tk.mainloop()

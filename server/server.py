@@ -8,6 +8,7 @@ import struct
 import pickle
 import string
 import os
+import tkinter as tk
 
 
 class Command:
@@ -118,27 +119,59 @@ class ServerThread(threading.Thread):
             #     f.write("%s" % item)
 
 
+class Server(threading.Thread):
+    def __init__(self, host, port):
+        super(Server, self).__init__()
+
+        self.root = tk.Tk()
+        self.root.title("Server status")
+        self.frm = tk.Frame(self.root)
+        self.connections = {}
+        self.host = host
+        self.port = port
+
+    def run(self):
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.bind((self.host, self.port))
+        server_socket.listen(5)  # if 1, will have multi client problem
+        print("Listening...")
+
+        while True:
+            (clientSocket, address) = server_socket.accept()
+            print("Got incoming connection")
+            # make a new instance of our thread class to handle requests
+            new_thread = ServerThread(clientSocket)
+            new_thread.start()  # call run()
+            if new_thread.username not in self.connections:  # check whether username exists
+                self.connections[new_thread.username] = new_thread
+            else:
+                new_thread.close_thread()
+
+
 def main():
     host = "localhost"
-    port = 8789
+    port = 9789
 
-    connections = {}
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((host, port))
-    server_socket.listen(1)
-
-    print("Listening...")
-
-    while True:
-        (clientSocket, address) = server_socket.accept()
-        print("Got incoming connection")
-        # make a new instance of our thread class to handle requests
-        new_thread = ServerThread(clientSocket)
-        new_thread.start()  # call run()
-        if new_thread.username not in connections:  # check whether username exists
-            connections[new_thread.username] = new_thread
-        else:
-            new_thread.close_thread()
+    server = Server(host, port)
+    server.start()
+    # connections = {}
+    # server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # server_socket.bind((host, port))
+    # server_socket.listen(1)
+    #
+    # print("Listening...")
+    #
+    # while True:
+    #     (clientSocket, address) = server_socket.accept()
+    #     print("Got incoming connection")
+    #     # make a new instance of our thread class to handle requests
+    #     new_thread = ServerThread(clientSocket)
+    #     new_thread.start()  # call run()
+    #     if new_thread.username not in connections:  # check whether username exists
+    #         connections[new_thread.username] = new_thread
+    #     else:
+    #         new_thread.close_thread()
 
 
 if __name__ == '__main__':
