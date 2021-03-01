@@ -52,7 +52,6 @@ class Application:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port))
         msg = text_input.get()
-        print(msg)
         text_input.delete(0, tk.END)
         try:
             add_command = Command()

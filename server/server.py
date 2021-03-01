@@ -30,7 +30,7 @@ class ServerThread(threading.Thread):
                 print("Wanted 4 bytes got " + str(len(a)) + " bytes")
 
                 if len(a) < 4:
-                    raise Exception("Client closed socket, ending client thread")
+                    raise Exception("client closed socket, ending client thread")
 
                 message_length = struct.unpack('i', a)[0]
                 print("Message Length: ", message_length)
@@ -53,10 +53,11 @@ class ServerThread(threading.Thread):
                 elif client_command[0] == "Upload":
                     filename = client_command[1].split('/')[-1]
                     server_filename = 'server_received_' + filename
-                    file = open(server_filename, 'wb')
-                    file.write(new_command.payload)
-                    file.close()
+                    # file = open(server_filename, 'wb')
+                    # file.write(new_command.payload)
+                    # file.close()
                     # add spell check here
+                    self.spell_check(new_command.payload, server_filename)
 
                     reply_command = Command()
                     reply_command.command = "Uploaded " + server_filename
@@ -90,13 +91,27 @@ class ServerThread(threading.Thread):
         # Length of the message is just the length of the array
         self.mySocket.sendall(struct.pack("i", len(packed_data)))
         self.mySocket.sendall(packed_data)
-        self.mySocket.close()
+        # self.mySocket.close()
 
-    def spell_check(self):
+    def spell_check(self, payload, server_filename):
         """
         http://openbookproject.net/courses/python4fun/spellcheck.html
         :return:
         """
+        correct_words = open("correct.words").readlines()
+        correct_words = [word.strip() for word in correct_words]
+
+        modified_lines = []
+        for i, line in enumerate(payload):  # for each line
+            line = line.strip()
+            file_words = line.split()
+            for j, txt_word in enumerate(file_words):  # for each word in a line
+                if txt_word not in correct_words:
+                    file_words[j] = f"[{txt_word}]"
+            modified_lines.append(' '.join(file_words) + '\n')
+        f = open(server_filename, 'wb')
+        f.writelines(modified_lines)
+        f.close()
 
 
 def main():

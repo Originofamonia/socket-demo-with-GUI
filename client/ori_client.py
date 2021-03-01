@@ -68,7 +68,7 @@ def createList(listName, s):
             listID = ServerCommand[1]
             playlist = open("Lists/" + listID + ".txt", 'w')
             playlist.write(listName + "\n")
-            playlist.close()  # Create a new playlist at Client terminal
+            playlist.close()  # Create a new playlist at client terminal
             print("The playlist was successfully created as ID:", listID)
             return listID
     except Exception as e:
