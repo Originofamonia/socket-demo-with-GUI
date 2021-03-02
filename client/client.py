@@ -69,13 +69,14 @@ class Application:
                 data += self.sock.recv(reply_len - len(data))
             reply_command = pickle.loads(data)  # Receive the server reply
             server_command = reply_command.command.split(" ")
-            if server_command[0] == "Connect":
+            if server_command[0] == "connected":
                 username = reply_command.payload
-                if not username:
-                    self.listbox.insert(1, f"username: {username} existed")
-                    self.sock.close()
-                else:
-                    self.listbox.insert(1, f'{username} connected')
+                self.listbox.delete(0, tk.END)
+                self.listbox.insert(1, f'{username} connected')
+            elif server_command[0] == 'conflict':
+                username = reply_command.payload
+                self.listbox.delete(0, tk.END)
+                self.listbox.insert(1, f'{username} conflicted')
 
         except Exception as e:
             print('Error in connect: ', e)

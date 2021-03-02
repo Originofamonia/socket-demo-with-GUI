@@ -1,2 +1,2 @@
-Now call bind(hostname, port) function to
-specify a port for your serice on the gien host.
+now call bind function to
+specify a port for your serice on the gien host
