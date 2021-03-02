@@ -1,0 +1,2 @@
+To write Iternet servers, we use the socket function avlable in socket module to create a socket object.
+A socket obect is then used to call other functions to setup a socket server.

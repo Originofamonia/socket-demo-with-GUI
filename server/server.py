@@ -12,6 +12,9 @@ import tkinter as tk
 
 
 class Command:
+    """
+    data struct used between client-server
+    """
     command = ""
     payload = ""
 
@@ -20,14 +23,15 @@ class ServerThread(threading.Thread):
     # class of server thread
     def __init__(self, socket_instance,):
         threading.Thread.__init__(self)
-        self.mySocket = socket_instance
+        self.my_socket = socket_instance
         self.username = None
+        # self.connections = {}
 
     def run(self):
         try:
             while True:
                 print("Reading initial length")
-                a = self.mySocket.recv(4)
+                a = self.my_socket.recv(4)
                 print("Wanted 4 bytes got " + str(len(a)) + " bytes")
 
                 if len(a) < 4:
@@ -37,7 +41,7 @@ class ServerThread(threading.Thread):
                 print("Message Length: ", message_length)
                 data = bytearray()
                 while message_length > len(data):
-                    data += self.mySocket.recv(message_length - len(data))
+                    data += self.my_socket.recv(message_length - len(data))
 
                 new_command = pickle.loads(data)
                 print("\nCommand is: ", new_command.command.replace('_', ' '))
@@ -54,10 +58,10 @@ class ServerThread(threading.Thread):
                 elif client_command[0] == "Upload":
                     filename = client_command[1].split('/')[-1]
                     server_filename = 'server_received_' + filename
-                    file = open(server_filename, 'wb')
-                    file.write(new_command.payload)
-                    file.close()
-                    # add spell check here
+                    file = open(server_filename, 'wb')  # wb means write bytes
+                    file.write(new_command.payload)  # write bytes to file
+                    file.close()  # close file handler
+                    # add lexicon check here
                     self.spell_check(server_filename)
 
                     reply_command = Command()
@@ -66,19 +70,30 @@ class ServerThread(threading.Thread):
                     reply_command.payload = server_file.read()
                     server_file.close()
 
+                elif client_command[0] == 'exit':
+                    reply_command = Command()
+                    reply_command.command = 'exit'
+                    reply_command.payload = 'done'
+                    packed_data = pickle.dumps(reply_command)  # Serialize the class to a binary array
+                    # Length of the message is just the length of the array
+                    self.my_socket.sendall(struct.pack("i", len(packed_data)))
+                    self.my_socket.sendall(packed_data)
+                    self.my_socket.close()
+                    return "exit"
                 else:
                     print("Unknown Command:", new_command.command.replace('_', ' '))
                     raise Exception("Unknown Command")
 
                 packed_data = pickle.dumps(reply_command)  # Serialize the class to a binary array
                 # Length of the message is just the length of the array
-                self.mySocket.sendall(struct.pack("i", len(packed_data)))
-                self.mySocket.sendall(packed_data)
+                self.my_socket.sendall(struct.pack("i", len(packed_data)))
+                self.my_socket.sendall(packed_data)
+                return 0
 
         except Exception as e:
             print(e)
             print("\nClosing socket")
-            self.mySocket.close()
+            self.my_socket.close()
 
     def close_thread(self):
         """
@@ -90,9 +105,9 @@ class ServerThread(threading.Thread):
         reply_command.payload = str()
         packed_data = pickle.dumps(reply_command)  # Serialize the class to a binary array
         # Length of the message is just the length of the array
-        self.mySocket.sendall(struct.pack("i", len(packed_data)))
-        self.mySocket.sendall(packed_data)
-        # self.mySocket.close()
+        self.my_socket.sendall(struct.pack("i", len(packed_data)))
+        self.my_socket.sendall(packed_data)
+        self.my_socket.close()
 
     def spell_check(self, server_filename):
         """
@@ -125,10 +140,24 @@ class Server(threading.Thread):
 
         self.root = tk.Tk()
         self.root.title("Server status")
-        self.frm = tk.Frame(self.root)
+        self.root.geometry('250x250')
+        self.frm = tk.Frame(self.root,)
         self.connections = {}
         self.host = host
         self.port = port
+
+        # GUI
+        self.frm_m = tk.Frame(self.frm,)
+        self.var = tk.StringVar()
+        self.label = tk.Label(self.root, textvariable=self.var, relief=tk.RAISED)
+        self.var.set('Connected usernames')
+        self.scrollbar = tk.Scrollbar(master=self.frm_m)
+        self.listbox = tk.Listbox(master=self.frm_m, yscrollcommand=self.scrollbar.set,)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y, expand=False)
+        self.listbox.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
+        self.label.pack()
+        self.frm_m.pack()
+        self.frm.pack()
 
     def run(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -138,23 +167,31 @@ class Server(threading.Thread):
         print("Listening...")
 
         while True:
-            (clientSocket, address) = server_socket.accept()
+            for name, cli_thread in self.connections.items():
+                if cli_thread.my_socket.fileno() == -1:
+                    self.connections.pop(name, None)
+            (client_socket, address) = server_socket.accept()
             print("Got incoming connection")
             # make a new instance of our thread class to handle requests
-            new_thread = ServerThread(clientSocket)
+            new_thread = ServerThread(client_socket)
             new_thread.start()  # call run()
             if new_thread.username not in self.connections:  # check whether username exists
                 self.connections[new_thread.username] = new_thread
             else:
                 new_thread.close_thread()
 
+            # update listbox showing connected usernames
+            self.listbox.delete(0, tk.END)  # clear all
+            self.listbox.insert(tk.END, list(self.connections.keys()))  # insert new data
+
 
 def main():
     host = "localhost"
-    port = 9789
+    port = 7789
 
     server = Server(host, port)
     server.start()
+    server.root.mainloop()
     # connections = {}
     # server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # server_socket.bind((host, port))

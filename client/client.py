@@ -28,6 +28,7 @@ class Application:
         self.root.title("File transfer")
         self.frm = tk.Frame(self.root)
         self.sock = None
+        self.username = None
 
         # Mid
         self.frm_M = tk.Frame(self.frm)
@@ -44,6 +45,7 @@ class Application:
         # text_input.insert(0, "username")
         tk.Button(self.frm_M, text='Connect', command=lambda: self.connect(text_input), width=15).pack(side=tk.TOP)
         tk.Button(self.frm_M, text='Upload', command=self.upload, width=15).pack(side=tk.TOP)
+        tk.Button(self.frm_M, text='Exit', command=self.exit, width=15).pack(side=tk.TOP)
         self.frm_M.pack(side=tk.LEFT)
 
         self.frm.pack()
@@ -51,12 +53,12 @@ class Application:
     def connect(self, text_input):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port))
-        msg = text_input.get()
+        self.username = text_input.get()
         text_input.delete(0, tk.END)
         try:
             add_command = Command()
-            add_command.command = f'Connect {msg}'
-            add_command.payload = msg
+            add_command.command = f'Connect {self.username}'
+            add_command.payload = self.username
             packed_data = pickle.dumps(add_command)
             self.sock.sendall(struct.pack('i', len(packed_data)))
             self.sock.sendall(packed_data)
@@ -66,7 +68,6 @@ class Application:
             while reply_len > len(data):
                 data += self.sock.recv(reply_len - len(data))
             reply_command = pickle.loads(data)  # Receive the server reply
-
             server_command = reply_command.command.split(" ")
             if server_command[0] == "Connect":
                 username = reply_command.payload
@@ -77,7 +78,7 @@ class Application:
                     self.listbox.insert(1, f'{username} connected')
 
         except Exception as e:
-            print('Error occurred: ', e)
+            print('Error in connect: ', e)
 
     def upload(self):
         try:
@@ -108,12 +109,35 @@ class Application:
                 return server_filename
 
         except Exception as e:
-            print("Error occurred: ", e)
+            print("Error in upload: ", e)
+
+    def exit(self):
+        try:
+            # send exit message
+            add_command = Command()
+            add_command.command = 'exit'
+            add_command.payload = self.username
+            packed_data = pickle.dumps(add_command)
+            self.sock.sendall(struct.pack('i', len(packed_data)))
+            self.sock.sendall(packed_data)
+
+            reply_len = struct.unpack("i", self.sock.recv(4))[0]
+            data = bytearray()
+            while reply_len > len(data):
+                data += self.sock.recv(reply_len - len(data))
+            reply_command = pickle.loads(data)  # Receive the server reply
+            self.listbox.insert(3, "server echoed: ", reply_command.payload)
+            # kill itself
+            self.sock.close()
+            os._exit(0)
+
+        except Exception as ex:
+            print('error in exit: ', ex)
 
 
 def main():
     host = "localhost"
-    port = 9789
+    port = 7789
 
     root = Application(host, port)
     tk.mainloop()

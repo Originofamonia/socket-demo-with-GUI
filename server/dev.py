@@ -23,7 +23,7 @@ def spell_check(server_filename):
 
 
 def main():
-    server_filename = '../client/file.txt'
+    server_filename = '../client/file1.txt'
     rcv_file = spell_check(server_filename)
     print(rcv_file)
 
