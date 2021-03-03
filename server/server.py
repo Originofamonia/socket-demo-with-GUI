@@ -87,6 +87,7 @@ class ServerThread(threading.Thread):
                     self.my_socket.close()
                     break
                 else:
+                    # handle unknown command
                     print("Unknown Command:", new_command.command.replace('_', ' '))
                     raise Exception("Unknown Command")
 
@@ -99,14 +100,6 @@ class ServerThread(threading.Thread):
             print(e)
             print("\nClosing socket")
             self.my_socket.close()
-
-    # def close_thread(self):
-    #     """
-    #     change this function to handle conflict username
-    #     update connections; allow reconnect w a different username
-    #     :return:
-    #     """
-    #     pass
 
     def spell_check(self, server_filename):
         """
@@ -151,7 +144,7 @@ class Server(threading.Thread):
         self.root.title("Server status")
         self.root.geometry('250x250')
         self.frm = tk.Frame(self.root,)
-        self.connections = []
+        self.connections = []  # list holds client connections
         self.host = host
         self.port = port
 
@@ -163,6 +156,7 @@ class Server(threading.Thread):
         self.scrollbar = tk.Scrollbar(master=self.frm_m)
         self.listbox = tk.Listbox(master=self.frm_m, yscrollcommand=self.scrollbar.set,)
         tk.Button(self.frm_m, text='Refresh', command=self.refresh, width=15).pack(side=tk.BOTTOM)
+        tk.Button(self.frm_m, text='Exit', command=self.exit, width=15).pack(side=tk.BOTTOM)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y, expand=False)
         self.listbox.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
         self.label.pack()
@@ -170,14 +164,14 @@ class Server(threading.Thread):
         self.frm.pack()
 
     def run(self):
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_socket.bind((self.host, self.port))
-        server_socket.listen(1)  # if 1, will have multi client problem
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen(1)  # if 1, will have multi client problem
         print("Listening...")
 
         while True:
-            (client_socket, address) = server_socket.accept()
+            (client_socket, address) = self.server_socket.accept()  # server socket accepting client connection
             print("Incoming connection ",)
             # make a new instance of our thread class to handle requests
             new_thread = ServerThread(client_socket, self.connections)
@@ -186,14 +180,10 @@ class Server(threading.Thread):
 
             self.connections.append(new_thread)
 
-            # if new_thread.username not in self.connections:  # check whether username exists
-            #     self.connections[new_thread.username] = new_thread
-            # else:
-            #     new_thread.close_thread()
-
             # update listbox showing connected usernames
-            self.listbox.delete(0, tk.END)  # clear all
-            self.listbox.insert(tk.END, [x.username for x in self.connections])  # insert new data
+            self.listbox.delete(0, tk.END)  # clear all in listbox
+            for x in self.connections:
+                self.listbox.insert(tk.END, x.username)  # insert new data
 
     def refresh(self,):
         # check username in server, not server_thread
@@ -202,8 +192,8 @@ class Server(threading.Thread):
             if cli_thread.my_socket.fileno() == -1:
                 self.connections.remove(cli_thread)
         self.listbox.delete(0, tk.END)  # clear all
-        # change below to get thread name from serverthread
-        self.listbox.insert(tk.END, [x.username for x in self.connections])  # insert new data; needs change
+        for x in self.connections:
+            self.listbox.insert(tk.END, x.username)  # insert new data
 
     def check_username(self, new_thread):
         # check username conflict
@@ -222,6 +212,21 @@ class Server(threading.Thread):
             del new_thread
         else:
             self.connections.append(new_thread)
+
+    def exit(self):
+        try:
+            # send exit massage
+            # add_command = Command()
+            # add_command.command = 'exit'
+            # add_command.payload = 'server'
+            # packed_data = pickle.dumps(add_command)
+            # self.server_socket.sendall(struct.pack('i', len(packed_data)))
+            # self.server_socket.sendall(packed_data)
+            self.server_socket.close()
+            os._exit(0)
+
+        except Exception as ex:
+            print('error in exit: ', ex)
 
 
 def main():
