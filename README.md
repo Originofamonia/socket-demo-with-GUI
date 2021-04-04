@@ -13,13 +13,13 @@
 05 – Comments in code. done <br>
 
 `project2`<br>
-20 – All elements of Lab #1 present and functioning correctly. done
-10 – Client accepts additions to lexicon via GUI. done
-10 – Client correctly maintains FIFO queue. done
-10 – Clients indicate they have been polled. done
-10 – Client prints contents of queue retrieved by server to GUI
-05 – Client purges contents of queue after polling.
-15 – Server correctly polls clients.
-05 – Server removes duplicate entries in lexicon.
-10 – Files received from clients compared against updated lexicon.
-05 – Comments in code.
+20 – All elements of Lab #1 present and functioning correctly. done <br>
+10 – Client accepts additions to lexicon via GUI. done <br>
+10 – Client correctly maintains FIFO queue. done <br>
+10 – Clients indicate they have been polled. done <br>
+10 – Client prints contents of queue retrieved by server to GUI. done <br> 
+05 – Client purges contents of queue after polling. done <br>
+15 – Server correctly polls clients. done <br>
+05 – Server removes duplicate entries in lexicon. done <br>
+10 – Files received from clients compared against updated lexicon. done <br>
+05 – Comments in code. <br>

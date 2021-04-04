@@ -154,6 +154,7 @@ class Application:
                         self.q.queue.clear()
 
                     self.listbox.delete(1, tk.END)
+                    self.listbox.insert(tk.END, f'polled queue: {reply_command.payload}')
 
                 elif server_command[0] == 'addlexicon':
                     print("server_command[0] == 'addlexicon'")

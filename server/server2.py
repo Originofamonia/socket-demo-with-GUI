@@ -159,6 +159,7 @@ class Server(threading.Thread):
         self.port = port
         self.correct_words = open("correct.words").readlines()
         self.correct_words = [word.strip() for word in self.correct_words]
+        self.correct_words = list(set(self.correct_words))
 
         # GUI
         self.frm_m = tk.Frame(self.frm,)
