@@ -25,9 +25,10 @@ class ServerThread(threading.Thread):
     # class of server thread
     def __init__(self, socket_instance, connections, correct_words):
         threading.Thread.__init__(self)
+        self.username = None
         self.my_socket = socket_instance
         self.connections = connections
-        self.correct_words = correct_words
+        self.correct_words = correct_words  # correct words dictionary
 
     def run(self):
         try:
@@ -208,45 +209,22 @@ class Server(threading.Thread):
     def add_lexicon(self):
         while True:
             time.sleep(9)  # time interval
-            for x in self.connections:  # filter lex thread
-                if x.my_socket.fileno() != -1 and 'lex' in x.username:  # check lexicon socket is good
+            for conn in self.connections:  # filter lex thread
+                if conn.my_socket.fileno() != -1 and 'lex' in conn.username:  # check lexicon socket is good
                     server_command = Command()
                     server_command.command = 'poll'
                     server_command.payload = ''
                     packed_data = pickle.dumps(server_command)  # Serialize the class to a binary array
-                    x.my_socket.sendall(struct.pack("i", len(packed_data)))
-                    x.my_socket.sendall(packed_data)
-                    print('send poll: ', x.my_socket)
-
-                    # a = x.my_socket.recv(4)
-                    # print("2: Wanted 4 bytes got " + str(len(a)) + " bytes")
-                    # if len(a) < 4:
-                    #     raise Exception("client closed socket, ending client thread")
-                    #
-                    # msg_length = struct.unpack('i', a)[0]
-                    # data = bytearray()
-                    # while msg_length > len(data):
-                    #     print("Message2 Length, data len: ", msg_length, len(data))
-                    #     data += x.my_socket.recv(msg_length - len(data))  # has problem
-                    #
-                    # print("data: ", data)
-                    # new_command = pickle.loads(data)
-                    # print("\nCommand is: ", new_command.command.replace('_', ' '))
-                    #
-                    # client_command = new_command.command.split(" ")
-                    # if client_command[0] == "add_lexicon":
-                    #     new_lexicons = client_command.payload.split(' ')
-                    #     for lex in new_lexicons:
-                    #         if lex not in self.correct_words:
-                    #             self.correct_words.append(lex)
-                    #             print('append:', lex)
+                    conn.my_socket.sendall(struct.pack("i", len(packed_data)))
+                    conn.my_socket.sendall(packed_data)
+                    print('send poll: ', conn.username)
 
     def refresh(self,):
         # check username in server, not server_thread
         # 2. update listbox
-        for cli_thread in self.connections:
-            if cli_thread.my_socket.fileno() == -1:
-                self.connections.remove(cli_thread)
+        for conn in self.connections:
+            if conn.my_socket.fileno() == -1:
+                self.connections.remove(conn)
         self.listbox.delete(0, tk.END)  # clear all
         for x in self.connections:
             if 'lex' not in x.username:

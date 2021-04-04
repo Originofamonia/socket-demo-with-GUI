@@ -122,6 +122,7 @@ class Application:
         lexicon = lexicon_entry.get()
         lexicon_entry.delete(0, tk.END)
         self.q.put(lexicon)
+        self.listbox.insert(tk.END, f'queue add: {lexicon}')
 
     def wait_poll(self):
         try:
@@ -151,6 +152,8 @@ class Application:
                     else:
                         reply_command.payload = ' '.join(list(self.q.queue))
                         self.q.queue.clear()
+
+                    self.listbox.delete(1, tk.END)
 
                 elif server_command[0] == 'addlexicon':
                     print("server_command[0] == 'addlexicon'")
