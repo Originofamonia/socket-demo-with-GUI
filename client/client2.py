@@ -1,4 +1,5 @@
 """
+Project 2
 name
 id
 """
@@ -9,6 +10,9 @@ import select
 import os
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
+import threading
+from queue import Queue
+import time
 
 
 class Command:
@@ -22,14 +26,16 @@ class Command:
 class Application:
     # class for client GUI
     def __init__(self, host, port):
+        # super(Application, self).__init__()
         self.host = host
         self.port = port
         self.root = tk.Tk()
         self.root.title("File transfer")
         self.frm = tk.Frame(self.root)
-        self.sock = None
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.username = None
-
+        self.lexicon_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.q = Queue()
         # Mid
         self.frm_M = tk.Frame(self.frm)
         self.scrollbar = tk.Scrollbar(master=self.frm_M)
@@ -39,14 +45,15 @@ class Application:
         )
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y, expand=False)
         self.listbox.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-        username_entry = tk.Entry(master=self.frm_M)
-        username_entry.pack(expand=True)
-        username_entry.bind("<Return>", lambda x: self.connect(username_entry))
-        lexicon_entry = tk.Entry(master=self.frm_M)
-        lexicon_entry.pack(expand=True)
-        lexicon_entry.bind("<Return>", lambda x: self.add_lexicon(lexicon_entry))
-        tk.Button(self.frm_M, text='Connect', command=lambda: self.connect(username_entry), width=15).pack(side=tk.TOP)
-        tk.Button(self.frm_M, text='Add lexicon', command=lambda: self.add_lexicon(lexicon_entry),
+        self.username_entry = tk.Entry(master=self.frm_M)
+        self.username_entry.pack(expand=True)
+        self.username_entry.bind("<Return>", lambda x: self.connect(self.username_entry))
+        self.lexicon_entry = tk.Entry(master=self.frm_M)
+        self.lexicon_entry.pack(expand=True)
+        self.lexicon_entry.bind("<Return>", lambda x: self.add_lexicon(self.lexicon_entry))
+        tk.Button(self.frm_M, text='Connect', command=lambda: self.connect(self.username_entry),
+                  width=15).pack(side=tk.TOP)
+        tk.Button(self.frm_M, text='Add lexicon', command=lambda: self.add_lexicon(self.lexicon_entry),
                   width=15).pack(side=tk.TOP)
         tk.Button(self.frm_M, text='Upload', command=self.upload, width=15).pack(side=tk.TOP)
         tk.Button(self.frm_M, text='Exit', command=self.exit, width=15).pack(side=tk.TOP)
@@ -55,10 +62,12 @@ class Application:
         self.frm.pack()
 
     def connect(self, text_input):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((self.host, self.port))
         self.username = text_input.get()
         text_input.delete(0, tk.END)
+        th = threading.Thread(target=self.connect2,)
+        th.start()
+        # time.sleep(0.01)
+        self.sock.connect((self.host, self.port))
         try:
             add_command = Command()
             add_command.command = f'Connect {self.username}'
@@ -85,14 +94,75 @@ class Application:
         except Exception as e:
             print('Error in connect: ', e)
 
-    def add_lexicon(self, text_input):
-        lexicon = text_input.get()
-        text_input.delete(0, tk.END)
+    def connect2(self,):
+        self.lexicon_sock.connect((self.host, self.port))
         try:
-            pass
+            add_command = Command()
+            add_command.command = f'Connect {self.username}_lex'
+            add_command.payload = self.username + '_lex'
+            packed_data = pickle.dumps(add_command)
+            self.lexicon_sock.sendall(struct.pack('i', len(packed_data)))
+            self.lexicon_sock.sendall(packed_data)
+
+            reply_len = struct.unpack("i", self.lexicon_sock.recv(4))[0]
+            data = bytearray()
+            while reply_len > len(data):
+                data += self.lexicon_sock.recv(reply_len - len(data))
+            reply_command = pickle.loads(data)  # Receive the server reply
+            server_command = reply_command.command.split(" ")
+            print('connect2: ', server_command)
 
         except Exception as e:
-            print('Error in add lexicon', e)
+            print('Error in connect: ', e)
+
+        self.wait_poll_th = threading.Thread(target=self.wait_poll, )
+        self.wait_poll_th.start()
+
+    def add_lexicon(self, lexicon_entry):
+        lexicon = lexicon_entry.get()
+        lexicon_entry.delete(0, tk.END)
+        self.q.put(lexicon)
+
+    def wait_poll(self):
+        try:
+            while True:
+                a = self.lexicon_sock.recv(4)
+                print("Wanted 4 bytes got " + str(len(a)) + " bytes")
+
+                if len(a) < 4:
+                    raise Exception("client closed socket, ending client thread")
+
+                message_length = struct.unpack('i', a)[0]
+                print("Message Length: ", message_length)
+                data = bytearray()
+                while message_length > len(data):
+                    data += self.lexicon_sock.recv(message_length - len(data))
+
+                new_command = pickle.loads(data)
+                print("\nCommand is: ", new_command.command.replace('_', ' '))
+
+                server_command = new_command.command.split(" ")
+                # Divide the command to recognize it, " " is the divider
+
+                if server_command[0] == "poll":
+                    reply_command = Command()
+                    reply_command.command = 'add_lexicon'
+                    reply_command.payload = ' '.join(list(self.q.queue))
+                    self.q.queue.clear()
+                else:
+                    # handle unknown command
+                    print("Unknown Command:", new_command.command.replace('_', ' '))
+                    raise Exception("Unknown Command")
+
+                packed_data = pickle.dumps(reply_command)  # Serialize the class to a binary array
+                # Length of the message is just the length of the array
+                self.lexicon_sock.sendall(struct.pack("i", len(packed_data)))
+                self.lexicon_sock.sendall(packed_data)
+
+        except Exception as e:
+            print(e)
+            print("\nClosing socket")
+            self.lexicon_sock.close()
 
     def upload(self):
         try:
@@ -153,10 +223,11 @@ def main():
     host = "localhost"
     port = 7789
 
-    root = Application(host, port)
-    tk.mainloop()
+    app = Application(host, port)
+    # app.start()
+    app.root.mainloop()
 
-    root.sock.close()
+    app.sock.close()
 
 
 if __name__ == '__main__':

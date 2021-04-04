@@ -1,4 +1,5 @@
 """
+Project 2
 name
 id
 """
@@ -26,6 +27,8 @@ class ServerThread(threading.Thread):
         threading.Thread.__init__(self)
         self.my_socket = socket_instance
         self.connections = connections
+        # self.correct_words = open("correct.words").readlines()
+        # self.correct_words = [word.strip() for word in self.correct_words]
 
     def run(self):
         try:
@@ -139,6 +142,7 @@ class ServerThread(threading.Thread):
 class Server(threading.Thread):
     def __init__(self, host, port):
         super(Server, self).__init__()
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.root = tk.Tk()
         self.root.title("Server status")
         self.root.geometry('250x250')
@@ -146,6 +150,8 @@ class Server(threading.Thread):
         self.connections = []  # list holds client connections
         self.host = host
         self.port = port
+        self.correct_words = open("correct.words").readlines()
+        self.correct_words = [word.strip() for word in self.correct_words]
 
         # GUI
         self.frm_m = tk.Frame(self.frm,)
@@ -166,11 +172,13 @@ class Server(threading.Thread):
         """
         https://pymotw.com/2/select/#poll
         """
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen(1)  # if 1, will have multi client problem
         print("Listening...")
+
+        self.lex_th = threading.Thread(target=self.add_lexicon)
+        self.lex_th.start()
 
         while True:
             (client_socket, address) = self.server_socket.accept()  # server socket accepting client connection
@@ -185,7 +193,43 @@ class Server(threading.Thread):
             # update listbox showing connected usernames
             self.listbox.delete(0, tk.END)  # clear all in listbox
             for x in self.connections:
-                self.listbox.insert(tk.END, x.username)  # insert new data
+                if 'lex' not in x.username:
+                    self.listbox.insert(tk.END, x.username)  # insert new data
+
+    def add_lexicon(self):
+        while True:
+            time.sleep(4)
+            for x in self.connections:  # filter lex thread
+                if x.my_socket.fileno() != -1 and 'lex' in x.username:
+                    server_command = Command()
+                    server_command.command = 'poll'
+                    server_command.payload = ''
+                    packed_data = pickle.dumps(server_command)  # Serialize the class to a binary array
+                    x.my_socket.sendall(struct.pack("i", len(packed_data)))
+                    x.my_socket.sendall(packed_data)
+
+                    a = x.my_socket.recv(4)
+                    print("Wanted 4 bytes got " + str(len(a)) + " bytes")
+
+                    if len(a) < 4:
+                        raise Exception("client closed socket, ending client thread")
+
+                    message_length = struct.unpack('i', a)[0]
+                    print("Message Length: ", message_length)
+                    data = bytearray()
+                    while message_length > len(data):
+                        data += x.my_socket.recv(message_length - len(data))
+
+                    new_command = pickle.loads(data)
+                    print("\nCommand is: ", new_command.command.replace('_', ' '))
+
+                    client_command = new_command.command.split(" ")
+                    if client_command[0] == "add_lexicon":
+                        new_lexicons = client_command.payload.split(' ')
+                        for lex in new_lexicons:
+                            if lex not in self.correct_words:
+                                self.correct_words.append(lex)
+                                print('append:', lex)
 
     def refresh(self,):
         # check username in server, not server_thread
@@ -195,7 +239,8 @@ class Server(threading.Thread):
                 self.connections.remove(cli_thread)
         self.listbox.delete(0, tk.END)  # clear all
         for x in self.connections:
-            self.listbox.insert(tk.END, x.username)  # insert new data
+            if 'lex' not in x.username:
+                self.listbox.insert(tk.END, x.username)  # insert new data
 
     def check_username(self, new_thread):
         # check username conflict
