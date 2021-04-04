@@ -140,24 +140,31 @@ class Application:
 
                 new_command = pickle.loads(data)
                 print("\nCommand is: ", new_command.command.replace('_', ' '))
-
                 server_command = new_command.command.split(" ")
                 # Divide the command to recognize it, " " is the divider
+                reply_command = Command()
 
                 if server_command[0] == "poll":
-                    reply_command = Command()
-                    reply_command.command = 'add_lexicon'
-                    reply_command.payload = ' '.join(list(self.q.queue))
-                    self.q.queue.clear()
+                    reply_command.command = 'addlexicon'
+                    if self.q.empty():
+                        reply_command.payload = ''
+                    else:
+                        reply_command.payload = ' '.join(list(self.q.queue))
+                        self.q.queue.clear()
+
+                elif server_command[0] == 'addlexicon':
+                    print("server_command[0] == 'addlexicon'")
+                    continue
                 else:
                     # handle unknown command
-                    print("Unknown Command:", new_command.command.replace('_', ' '))
+                    print("Unknown Command2:", new_command.command.replace('_', ' '))
                     raise Exception("Unknown Command")
 
                 packed_data = pickle.dumps(reply_command)  # Serialize the class to a binary array
                 # Length of the message is just the length of the array
                 self.lexicon_sock.sendall(struct.pack("i", len(packed_data)))
                 self.lexicon_sock.sendall(packed_data)
+                print('sent queue')
 
         except Exception as e:
             print(e)
@@ -213,6 +220,7 @@ class Application:
             self.listbox.insert(3, "server echoed: ", reply_command.payload)
             # kill itself
             self.sock.close()
+            self.lexicon_sock.close()
             os._exit(0)
 
         except Exception as ex:
