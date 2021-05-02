@@ -170,6 +170,7 @@ class Server(threading.Thread):
         self.correct_words = open("correct.words").readlines()  # open the correct word file
         self.correct_words = [word.strip() for word in self.correct_words]  # put correct words in a list
         self.correct_words = list(set(self.correct_words))  # remove duplicates
+        self.primary_connected = True
 
         # GUI
         self.frm_m = tk.Frame(self.frm, )  # add middle frame
@@ -197,7 +198,7 @@ class Server(threading.Thread):
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # set reuse socket
         self.server_socket.bind((self.host, self.port2))  # bind host address and port
         self.server_socket.listen(1)  # listen for incoming connection
-        print(f"Listening on {self.port2}")
+        print(f"Backup listening on {self.port2}")
 
         self.connect_primary()
 
@@ -205,22 +206,25 @@ class Server(threading.Thread):
         self.lex_th.start()
 
         while True:
-            (client_socket, address) = self.server_socket.accept()  # server socket accepting client connection
-            print("Incoming connection ", )
-            client_socket.setblocking(True)
-            # make a new instance of our thread class to handle requests
-            new_thread = ServerThread(client_socket, self.connections, self.correct_words)
+            if self.server_socket.fileno() != -1:
+                (client_socket, address) = self.server_socket.accept()  # server socket accepting client connection
+                print("Incoming connection ", )
+                client_socket.setblocking(True)
+                # make a new instance of our thread class to handle requests
+                new_thread = ServerThread(client_socket, self.connections, self.correct_words)
 
-            new_thread.start()  # call run()
-            time.sleep(0.09)  # control thread execution order
+                new_thread.start()  # call run()
+                time.sleep(0.09)  # control thread execution order
 
-            self.connections.append(new_thread)
+                self.connections.append(new_thread)
 
-            # update listbox showing connected usernames
-            self.listbox.delete(0, tk.END)  # clear all in listbox
-            for x in self.connections:
-                if 'lex' not in x.username:
-                    self.listbox.insert(tk.END, x.username)  # insert new data
+                # update listbox showing connected usernames
+                self.listbox.delete(0, tk.END)  # clear all in listbox
+                if not self.primary_connected:
+                    self.listbox.insert(tk.END, 'Primary not available')
+                for x in self.connections:
+                    if 'lex' not in x.username:
+                        self.listbox.insert(tk.END, x.username)  # insert new data
 
     def connect_primary(self):
         """
@@ -255,27 +259,30 @@ class Server(threading.Thread):
         """
         try:
             while True:
-                a = self.wait_push_sock.recv(4)
-                print("Wanted 4 bytes got " + str(len(a)) + " bytes")
+                if self.wait_push_sock.fileno() != -1:
+                    a = self.wait_push_sock.recv(4)
+                    print("Wanted 4 bytes got " + str(len(a)) + " bytes")
 
-                if len(a) < 4:
-                    raise Exception("client closed socket, ending client thread")
+                    if len(a) < 4:
+                        raise Exception("client closed socket, ending client thread")
 
-                message_length = struct.unpack('i', a)[0]
-                print("Message Length: ", message_length)
-                data = bytearray()
-                while message_length > len(data):
-                    data += self.wait_push_sock.recv(message_length - len(data))
+                    message_length = struct.unpack('i', a)[0]
+                    print("Message Length: ", message_length)
+                    data = bytearray()
+                    while message_length > len(data):
+                        data += self.wait_push_sock.recv(message_length - len(data))
 
-                new_command = pickle.loads(data)
-                print("\nCommand is: ", new_command.command.replace('_', ' '))
-                server_command = new_command.command.split(" ")
+                    new_command = pickle.loads(data)
+                    print("\nCommand is: ", new_command.command.replace('_', ' '))
+                    server_command = new_command.command.split(" ")
 
-                if server_command[0] == "addlexicon":
-                    self.correct_words = new_command.payload.split(' ')  # split a str into a list
+                    if server_command[0] == "addlexicon":
+                        self.correct_words = new_command.payload.split(' ')  # split a str into a list
 
         except Exception as e:
             print('Error in wait_push: ', e)
+            self.primary_connected = False
+            self.listbox.insert(tk.END, 'Primary not available')
 
     def add_lexicon(self):
         while True:
@@ -327,7 +334,8 @@ class Server(threading.Thread):
         try:  # server exit
             self.server_socket.close()
             self.root.destroy()
-            self.join()
+            # self.join()
+            os._exit(0)
 
         except Exception as ex:
             print('error in exit: ', ex)

@@ -31,7 +31,8 @@ class Application:
     def __init__(self, host, port1, port2):
         self.host = host  # host address
         self.port1 = port1  # primary port number
-        self.port2 = port2
+        self.port2 = port2  # backup port
+        self.event = threading.Event()
         self.root = tk.Tk()  # use tk as gui
         self.root.title("File transfer")  # tk gui's title
         self.frm = tk.Frame(self.root)  # tk frame
@@ -39,6 +40,8 @@ class Application:
         self.username = None  # client username
         self.lexicon_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # lexicon socket
         self.q = Queue()  # user input queue
+        self.primary_connected = True
+
         # Mid
         self.frm_M = tk.Frame(self.frm)  # middle frame
         self.scrollbar = tk.Scrollbar(master=self.frm_M)  # scrollbar for listbox
@@ -68,9 +71,15 @@ class Application:
 
     def connect(self, text_input, port):  # connect client to server
         self.username = text_input.get()  # get username from user input
-        text_input.delete(0, tk.END)  # clear text input
+        # text_input.delete(0, tk.END)  # clear text input
         self.connect_lexicon(port)
         self.sock.connect((self.host, port))  # connect socket to host address and port
+        self.send_connect()
+
+        self.check_primary_th = threading.Thread(target=self.check_primary,)
+        self.check_primary_th.start()
+
+    def send_connect(self):
         try:
             add_command = Command()  # command to send
             add_command.command = f'Connect {self.username}'  # set command as connect + username
@@ -97,16 +106,19 @@ class Application:
         except Exception as e:  # print exception
             print('Error in connect: ', e)
 
-        self.check_primary_th = threading.Thread(target=self.check_primary,)
-        self.check_primary_th.start()
-
     def connect_lexicon(self, port):
         """
         connect lexicon socket to server
         """
-        add_command = Command()
+        self.lexicon_sock.connect((self.host, port))
+        self.send_connect_lex()
+
+        self.wait_poll_th = threading.Thread(target=self.wait_poll, )
+        self.wait_poll_th.start()
+
+    def send_connect_lex(self):
         try:
-            self.lexicon_sock.connect((self.host, port))
+            add_command = Command()
             add_command.command = f'Connect {self.username}_lex'
             add_command.payload = self.username + '_lex'
             packed_data = pickle.dumps(add_command)
@@ -119,21 +131,37 @@ class Application:
                 data += self.lexicon_sock.recv(reply_len - len(data))
             reply_command = pickle.loads(data)  # Receive the server reply
             server_command = reply_command.command.split(" ")
-            print('connect2: ', server_command)
+            print('connect_lex: ', server_command)
 
         except Exception as e:
-            print('Error in connect: ', e)
-
-        self.wait_poll_th = threading.Thread(target=self.wait_poll, )
-        self.wait_poll_th.start()
+            print('Error in connect_lexicon: ', e)
 
     def check_primary(self):
         """
         check whether primary server socket is open
+        has error: debug
         """
-        while True:
+        while self.primary_connected:
             if self.sock.fileno() == -1 or self.lexicon_sock.fileno() == -1:
-                self.connect(self.username_entry, self.port2)
+                self.primary_connected = False
+                print('check_primary')
+                self.sock.close()
+                self.lexicon_sock.close()
+                self.listbox.insert(tk.END, 'Primary not available')
+                self.connect_backup()
+
+    def connect_backup(self):
+        """
+        reconnect client to backup
+        """
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.lexicon_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.connect((self.host, self.port2))
+        self.lexicon_sock.connect((self.host, self.port2))
+
+        self.send_connect()
+        self.send_connect_lex()
+        self.wait_poll()
 
     def add_lexicon(self, lexicon_entry):
         """
@@ -149,7 +177,7 @@ class Application:
         wait for server send poll command
         """
         try:
-            while True:
+            while self.lexicon_sock.fileno() != -1:
                 a = self.lexicon_sock.recv(4)
                 print("Wanted 4 bytes got " + str(len(a)) + " bytes")
 
@@ -194,8 +222,7 @@ class Application:
                 print('sent queue')
 
         except Exception as e:
-            print(e)
-            print("\nClosing socket")
+            print("error in wait_poll: ", e)
             self.lexicon_sock.close()
 
     def upload(self):  # upload file to server
@@ -230,7 +257,7 @@ class Application:
                 return server_filename
 
         except Exception as e:
-            print("Error in upload: ", e)
+            print("error in upload: ", e)
 
     def exit(self):
         try:
@@ -263,7 +290,7 @@ def main():
     port1 = 7789
     port2 = 9789
 
-    app = Application(host, port1)  # instantiate a client
+    app = Application(host, port1, port2)  # instantiate a client
     app.root.mainloop()  # client tk gui mainloop
     app.sock.close()  # close the client socket
 
