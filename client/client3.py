@@ -97,11 +97,11 @@ class Application:
             if server_command[0] == "connected":  # when server echoed connected
                 username = reply_command.payload  # get reply payload
                 self.listbox.delete(0, tk.END)  # clear listbox
-                self.listbox.insert(1, f'{username} connected')  # insert username connected
+                self.listbox.insert(0, f'{username} connected')  # insert username connected
             elif server_command[0] == 'conflict':  # when server echoed username conflict
                 username = reply_command.payload  # get username from payload
                 self.listbox.delete(0, tk.END)  # clear listbox
-                self.listbox.insert(1, f'{username} conflicted')  # insert username conflict
+                self.listbox.insert(0, f'{username} conflicted')  # insert username conflict
 
         except Exception as e:  # print exception
             print('Error in connect: ', e)
@@ -147,13 +147,14 @@ class Application:
                 print('check_primary')
                 self.sock.close()
                 self.lexicon_sock.close()
-                self.listbox.insert(tk.END, 'Primary not available')
                 self.connect_backup()
 
     def connect_backup(self):
         """
         reconnect client to backup
         """
+        # self.listbox.insert(tk.END, 'Primary not available')
+
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.lexicon_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port2))
@@ -161,6 +162,8 @@ class Application:
 
         self.send_connect()
         self.send_connect_lex()
+        self.listbox.insert(tk.END, 'Primary not available')
+        self.listbox.insert(tk.END, 'Connected to backup')
         self.wait_poll()
 
     def add_lexicon(self, lexicon_entry):
@@ -204,7 +207,7 @@ class Application:
                         reply_command.payload = ' '.join(list(self.q.queue))
                         self.q.queue.clear()
 
-                    self.listbox.delete(1, tk.END)
+                    # self.listbox.delete(1, tk.END)
                     self.listbox.insert(tk.END, f'polled queue: {reply_command.payload}')
 
                 elif server_command[0] == 'addlexicon':
@@ -250,7 +253,7 @@ class Application:
             server_command = reply_command.command.split(" ")  # parse reply command
             if server_command[0] == "Uploaded":  # when server returned uploaded file
                 server_filename = server_command[1]  # get server returned filename
-                self.listbox.insert(2, "Server echoed file: ", server_filename)  # put this msg into listbox
+                self.listbox.insert(tk.END, "Server echoed file: ", server_filename)  # put this msg into listbox
                 server_file = open(server_filename, 'wb')  # open the received file
                 server_file.write(reply_command.payload)  # write payload to file content
                 server_file.close()  # close file handler
@@ -274,7 +277,7 @@ class Application:
             while reply_len > len(data):  # continue to receive server msg
                 data += self.sock.recv(reply_len - len(data))
             reply_command = pickle.loads(data)  # Receive the server reply
-            self.listbox.insert(3, "server echoed: ", reply_command.payload)  # update listbox
+            self.listbox.insert(tk.END, "server echoed: ", reply_command.payload)  # update listbox
             # kill itself
             self.sock.close()
             self.lexicon_sock.close()

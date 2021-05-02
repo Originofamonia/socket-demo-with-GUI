@@ -246,6 +246,7 @@ class Server(threading.Thread):
             reply_command = pickle.loads(data)  # Receive the server reply
             server_command = reply_command.command.split(" ")
             print('connect wait_push: ', server_command)
+            self.listbox.insert(tk.END, 'connected to primary')
 
         except Exception as e:
             print('Error in add_push: ', e)
@@ -286,7 +287,7 @@ class Server(threading.Thread):
 
     def add_lexicon(self):
         while True:
-            time.sleep(60)  # time interval
+            time.sleep(19)  # time interval
             for conn in self.connections:  # filter lex thread
                 if conn.my_socket.fileno() != -1 and 'lex' in conn.username:  # check lexicon socket is good
                     server_command = Command()

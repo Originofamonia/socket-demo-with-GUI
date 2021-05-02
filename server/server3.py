@@ -224,7 +224,7 @@ class Server(threading.Thread):
 
     def add_lexicon(self):
         while True:
-            time.sleep(60)  # time interval
+            time.sleep(19)  # time interval
             for conn in self.connections:  # filter lex thread
                 if conn.my_socket.fileno() != -1 and 'lex' in conn.username:  # check lexicon socket is good
                     server_command = Command()
@@ -235,6 +235,7 @@ class Server(threading.Thread):
                     conn.my_socket.sendall(packed_data)
                     print('send poll: ', conn.username)
 
+            # for conn in self.connections:
                 if conn.my_socket.fileno() != -1 and 'backup_server' == conn.username:  # send whole lexicon to backup
                     server_command = Command()
                     server_command.command = 'addlexicon'
@@ -242,6 +243,7 @@ class Server(threading.Thread):
                     packed_data = pickle.dumps(server_command)  # Serialize the class to a binary array
                     conn.my_socket.sendall(struct.pack("i", len(packed_data)))
                     conn.my_socket.sendall(packed_data)
+                    # self.listbox.insert(tk.END, 'sent lexicon to backup')
                     print('send lexicon to: ', conn.username)
 
     def refresh(self,):
